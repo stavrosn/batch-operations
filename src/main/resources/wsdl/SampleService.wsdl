@@ -1,0 +1,230 @@
+<?xml version='1.0' encoding='UTF-8'?><wsdl:definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="http://gr.stevenicol.samples/soap/SampleService" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:ns1="http://schemas.xmlsoap.org/soap/http" name="SampleService" targetNamespace="http://gr.stevenicol.samples/soap/SampleService">
+  <wsdl:types>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://gr.stevenicol.samples/soap/SampleService" attributeFormDefault="unqualified" elementFormDefault="unqualified" targetNamespace="http://gr.stevenicol.samples/soap/SampleService" version="1.0">
+  <xs:element name="addPerson" type="tns:addPerson"/>
+  <xs:element name="addPersonResponse" type="tns:addPersonResponse"/>
+  <xs:element name="deletePerson" type="tns:deletePerson"/>
+  <xs:element name="deletePersonResponse" type="tns:deletePersonResponse"/>
+  <xs:element name="getPerson" type="tns:getPerson"/>
+  <xs:element name="getPersonResponse" type="tns:getPersonResponse"/>
+  <xs:element name="getPersons" type="tns:getPersons"/>
+  <xs:element name="getPersonsResponse" type="tns:getPersonsResponse"/>
+  <xs:element name="updatePerson" type="tns:updatePerson"/>
+  <xs:element name="updatePersonResponse" type="tns:updatePersonResponse"/>
+  <xs:complexType name="addPerson">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="arg0" type="tns:Person"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Person">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="name" type="xs:string"/>
+      <xs:element minOccurs="0" name="address" type="tns:Address"/>
+      <xs:element minOccurs="0" name="type" type="tns:ContactType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Address">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="street" type="xs:string"/>
+      <xs:element minOccurs="0" name="city" type="xs:string"/>
+      <xs:element minOccurs="0" name="postalCode" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="addPersonResponse">
+    <xs:sequence/>
+  </xs:complexType>
+  <xs:complexType name="getPersons">
+    <xs:sequence/>
+  </xs:complexType>
+  <xs:complexType name="getPersonsResponse">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="return" type="tns:Persons"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Persons">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="persons" nillable="true" type="tns:Person"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="updatePerson">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="arg0" type="xs:string"/>
+      <xs:element minOccurs="0" name="arg1" type="tns:Person"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="updatePersonResponse">
+    <xs:sequence/>
+  </xs:complexType>
+  <xs:complexType name="getPerson">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="arg0" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="getPersonResponse">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="return" type="tns:Person"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="deletePerson">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="arg0" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="deletePersonResponse">
+    <xs:sequence/>
+  </xs:complexType>
+  <xs:simpleType name="ContactType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="PERSONAL"/>
+      <xs:enumeration value="WORK"/>
+      <xs:enumeration value="OTHER"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="NoSuchPerson" nillable="true" type="xs:string"/>
+</xs:schema>
+  </wsdl:types>
+  <wsdl:message name="addPerson">
+    <wsdl:part element="tns:addPerson" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="updatePerson">
+    <wsdl:part element="tns:updatePerson" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getPersons">
+    <wsdl:part element="tns:getPersons" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getPersonsResponse">
+    <wsdl:part element="tns:getPersonsResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="NoSuchPersonException">
+    <wsdl:part element="tns:NoSuchPerson" name="NoSuchPersonException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getPersonResponse">
+    <wsdl:part element="tns:getPersonResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="updatePersonResponse">
+    <wsdl:part element="tns:updatePersonResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="getPerson">
+    <wsdl:part element="tns:getPerson" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="addPersonResponse">
+    <wsdl:part element="tns:addPersonResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="deletePerson">
+    <wsdl:part element="tns:deletePerson" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="deletePersonResponse">
+    <wsdl:part element="tns:deletePersonResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:portType name="SampleService">
+    <wsdl:operation name="addPerson">
+      <wsdl:input message="tns:addPerson" name="addPerson">
+    </wsdl:input>
+      <wsdl:output message="tns:addPersonResponse" name="addPersonResponse">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getPersons">
+      <wsdl:input message="tns:getPersons" name="getPersons">
+    </wsdl:input>
+      <wsdl:output message="tns:getPersonsResponse" name="getPersonsResponse">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="updatePerson">
+      <wsdl:input message="tns:updatePerson" name="updatePerson">
+    </wsdl:input>
+      <wsdl:output message="tns:updatePersonResponse" name="updatePersonResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:NoSuchPersonException" name="NoSuchPersonException">
+    </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="getPerson">
+      <wsdl:input message="tns:getPerson" name="getPerson">
+    </wsdl:input>
+      <wsdl:output message="tns:getPersonResponse" name="getPersonResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:NoSuchPersonException" name="NoSuchPersonException">
+    </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="deletePerson">
+      <wsdl:input message="tns:deletePerson" name="deletePerson">
+    </wsdl:input>
+      <wsdl:output message="tns:deletePersonResponse" name="deletePersonResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:NoSuchPersonException" name="NoSuchPersonException">
+    </wsdl:fault>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="SampleServiceSoapBinding" type="tns:SampleService">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="addPerson">
+      <soap:operation soapAction="" style="document"/>
+      <wsdl:input name="addPerson">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="addPersonResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getPersons">
+      <soap:operation soapAction="" style="document"/>
+      <wsdl:input name="getPersons">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="getPersonsResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="updatePerson">
+      <soap:operation soapAction="" style="document"/>
+      <wsdl:input name="updatePerson">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="updatePersonResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="NoSuchPersonException">
+        <soap:fault name="NoSuchPersonException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="getPerson">
+      <soap:operation soapAction="" style="document"/>
+      <wsdl:input name="getPerson">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="getPersonResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="NoSuchPersonException">
+        <soap:fault name="NoSuchPersonException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="deletePerson">
+      <soap:operation soapAction="" style="document"/>
+      <wsdl:input name="deletePerson">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="deletePersonResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="NoSuchPersonException">
+        <soap:fault name="NoSuchPersonException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="SampleService">
+    <wsdl:port binding="tns:SampleServiceSoapBinding" name="SampleServicePort">
+      <soap:address location="http://localhost:8080/cxf/services/person"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>
