@@ -2,8 +2,6 @@ package gr.stevenicol.samples.infinisoap;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.support.builder.Namespaces;
-
 import samples.stevenicol.gr.soap.sampleservice.*;
 
 @ApplicationScoped

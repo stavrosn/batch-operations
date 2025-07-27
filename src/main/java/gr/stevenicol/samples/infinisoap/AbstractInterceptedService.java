@@ -24,15 +24,37 @@ public abstract class AbstractInterceptedService {
         serviceRequest.setSessionId(getCurrentSessionId());
         serviceRequest.addHeader("operation", operation);
         
-        if (responseType == Void.class || responseType == void.class) {
-            // For void operations
-            producerTemplate.sendBodyAndHeaders("direct:soap-interceptor", 
-                serviceRequest, serviceRequest.getHeaders());
-            return null;
-        } else {
-            // For operations with return values
-            return producerTemplate.requestBodyAndHeaders("direct:soap-interceptor", 
-                serviceRequest, serviceRequest.getHeaders(), responseType);
+        try {
+            if (responseType == Void.class || responseType == void.class) {
+                // For void operations
+                producerTemplate.sendBodyAndHeaders("direct:soap-interceptor", 
+                    serviceRequest, serviceRequest.getHeaders());
+                return null;
+            } else {
+                // For operations with return values
+                return producerTemplate.requestBodyAndHeaders("direct:soap-interceptor", 
+                    serviceRequest, serviceRequest.getHeaders(), responseType);
+            }
+        } catch (org.apache.camel.CamelExecutionException e) {
+            // Check if the root cause is a SoapFault and rethrow it
+            Throwable cause = e.getCause();
+            while (cause != null) {
+                if (cause instanceof org.apache.cxf.binding.soap.SoapFault) {
+                    throw (org.apache.cxf.binding.soap.SoapFault) cause;
+                }
+                if (cause instanceof FaultError) {
+                    FaultError faultError = (FaultError) cause;
+                    // Create and throw SoapFault directly
+                    org.apache.cxf.binding.soap.SoapFault soapFault = new org.apache.cxf.binding.soap.SoapFault(
+                        faultError.getMessage(),
+                        new javax.xml.namespace.QName("http://gr.stevenicol.samples/soap/SampleService", faultError.getErrorCode())
+                    );
+                    throw soapFault;
+                }
+                cause = cause.getCause();
+            }
+            // If no SoapFault found, rethrow original exception
+            throw e;
         }
     }
 
