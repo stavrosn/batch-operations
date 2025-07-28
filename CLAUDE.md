@@ -9,12 +9,15 @@ This project demonstrates a robust enterprise pattern for SOAP web services usin
 ### Technologies Used
 - **Quarkus CXF**: SOAP web service implementation
 - **Apache Camel**: Integration routing and patterns
+- **Infinispan**: Distributed caching for large data (125-150MB support)
 - **JAX-WS**: Web service annotations and contracts
 - **CDI**: Dependency injection and interceptors
+- **Protobuf**: Efficient serialization for cache data
 
 ### Design Pattern
 - **Contract-first approach**: WSDL → Generated interfaces → Service implementation
 - **Interceptor pattern**: Centralized cross-cutting concerns for auditing and security
+- **Streaming cache architecture**: Chunked storage for large data (125-150MB)
 - **Library-ready design**: Reusable components for multiple SOAP services
 
 ## Key Components
@@ -51,15 +54,77 @@ This project demonstrates a robust enterprise pattern for SOAP web services usin
 - `executeWithInterceptor()` method ensures all operations go through interceptor
 - Handles both void and return-type operations
 - Provides user/session context abstraction
+- **Exception handling**: Catches and properly converts `FaultError` to `SoapFault`
+- **Error propagation**: Ensures custom SOAP faults reach the client correctly
 
 #### `InterceptorRouter.java` ⭐
 - **Centralized cross-cutting concerns** implementation
 - Route: `direct:soap-interceptor` → `direct:audit-incoming` → `direct:security-check` → target route → `direct:audit-outgoing`
 - Audit logging with timestamps, user tracking, processing time
 - Security validation and authorization checks
+- **Custom exception handling**: Converts `FaultError` to `SoapFault` with proper fault codes
 - **Library-ready**: No dependencies on business logic
 
-### 3. Alternative Enforcement (CDI-based)
+#### `FaultError.java` ⭐
+- **Custom exception class** for interceptor-level errors
+- Categorized error types: `AUDIT_FAILURE`, `AUTHENTICATION_FAILURE`, `AUTHORIZATION_FAILURE`, `VALIDATION_FAILURE`
+- **Static factory methods** for common error scenarios:
+  - `FaultError.auditError(message)` - Audit validation failures
+  - `FaultError.authenticationError(message)` - Authentication failures
+  - `FaultError.authorizationError(message)` - Authorization failures
+  - `FaultError.validationError(message)` - Data validation failures
+- **Error metadata**: Error codes and types for detailed fault responses
+
+### 3. Infinispan Caching Framework
+
+#### `CacheData.java` ⭐
+- **Protobuf serialization class** for cache entries with `@Proto` annotation
+- Contains `dateString` and `data` fields with `@ProtoField` annotations
+- Efficient serialization for large data (125-150MB support)
+
+#### `CacheDataSchemaContext.java`
+- **Protobuf schema context** using `@ProtoSchema` annotation
+- Includes `CacheData`, `CacheMetadata`, and `CacheChunk` classes
+- Generates `.proto` schema files and registers serializers automatically
+
+#### `CamelInfinispanCacheService.java` ⭐
+- **Standard caching service** using Camel ProducerTemplate
+- Methods: `putLargeString()`, `getLargeString()`, `containsKey()`, `remove()`, `getCacheSize()`
+- **Success/failure detection**: Returns boolean values for all operations
+- **Async variants**: CompletableFuture<Boolean> support for non-blocking operations
+
+#### `CamelInfinispanRouter.java`
+- **Camel routes for cache operations**: PUT, GET, REMOVE, CONTAINSKEY, SIZE, CLEAR
+- Enhanced error handling with doTry/doCatch patterns
+- Returns "SUCCESS" or "FAILED" strings for operation status detection
+
+#### `StreamingCacheService.java` ⭐
+- **Advanced chunked storage** for very large data (125-150MB)
+- **10MB default chunk size** with configurable chunking strategy
+- Methods: `putLargeDataStream()`, `getLargeDataStream()`, `removeLargeDataStream()`
+- **Progress tracking**: Real-time callbacks with completion status and error detection
+- **Metadata-driven reconstruction** of chunked data
+
+#### `CacheMetadata.java`
+- **Metadata storage** for chunked cache entries
+- Tracks original key, timestamp, total size, total chunks, and chunk size
+- Essential for reconstructing large data from chunks
+
+#### `CacheChunk.java`
+- **Individual chunk representation** with chunk index, byte data, and timestamp
+- Protobuf serialization for efficient storage and retrieval
+
+#### `StreamProgress.java`
+- **Progress tracking class** for streaming operations
+- Provides completion status, error detection, and percentage calculation
+- Real-time feedback during large data uploads/downloads
+
+#### `StreamingExample.java`
+- **Complete usage examples** for streaming cache operations
+- Demonstrates 125MB data upload/download with progress tracking
+- SOAP service integration examples for caching large XML responses
+
+### 4. Alternative Enforcement (CDI-based)
 
 #### `@Intercepted` Annotation
 - Method-level annotation to mark intercepted operations
@@ -111,6 +176,82 @@ public Persons getPersons() {
 - ❌ Requires CDI configuration
 - ❌ Runtime enforcement only
 
+### Pattern 3: Infinispan Caching Integration
+
+#### Standard Cache Operations
+```java
+@Inject
+CamelInfinispanCacheService cacheService;
+
+// Store large data with success detection
+boolean success = cacheService.putLargeString("user-data-123", largeXmlData);
+
+// Retrieve data
+String cachedData = cacheService.getLargeString("user-data-123");
+
+// Async operations
+CompletableFuture<Boolean> asyncResult = cacheService.putLargeStringAsync("key", data);
+```
+
+#### Streaming Operations for Very Large Data (125-150MB)
+```java
+@Inject
+StreamingCacheService streamingService;
+
+// Upload with progress tracking
+CompletableFuture<Boolean> uploadFuture = streamingService.putLargeDataStream(
+    "large-document-1", 
+    veryLargeData,
+    progress -> {
+        System.out.println("Upload progress: " + progress.getProgressPercent() + "%");
+        if (progress.hasError()) {
+            System.err.println("Error: " + progress.getMessage());
+        }
+    }
+);
+
+// Download with progress tracking
+CompletableFuture<String> downloadFuture = streamingService.getLargeDataStream(
+    "large-document-1",
+    progress -> {
+        System.out.println("Download progress: " + progress.getProgressPercent() + "%");
+    }
+);
+```
+
+#### SOAP Service Integration with Caching
+```java
+@WebService
+@ApplicationScoped
+public class CachedServiceImpl extends AbstractInterceptedService implements SampleService {
+    
+    @Inject
+    StreamingCacheService streamingCache;
+    
+    @Override
+    public Persons getPersons() {
+        String cacheKey = "persons-" + getCurrentUserId();
+        
+        // Try cache first
+        CompletableFuture<String> cachedData = streamingCache.getLargeDataStream(cacheKey, null);
+        
+        if (cachedData != null && cachedData.join() != null) {
+            // Return from cache
+            return deserializePersons(cachedData.join());
+        }
+        
+        // Execute through interceptor
+        Persons result = executeWithInterceptor("getPersons", null, "direct:getPersons", Persons.class);
+        
+        // Cache the result asynchronously
+        String serializedResult = serializePersons(result);
+        streamingCache.putLargeDataStream(cacheKey, serializedResult, null);
+        
+        return result;
+    }
+}
+```
+
 ## Cross-Cutting Concerns
 
 ### Auditing Features
@@ -118,12 +259,27 @@ public Persons getPersons() {
 - **Performance monitoring**: Processing time measurement
 - **Client tracking**: IP address and session management
 - **Outgoing responses**: Result logging and audit trail
+- **Maintenance mode**: Block operations during maintenance windows
+- **Session validation**: Require valid session IDs for all operations
 
 ### Security Features
-- **Authorization checks**: User validation per operation
+- **Authentication checks**: User ID validation for all operations
+- **Authorization checks**: Role-based access control (e.g., admin-only operations)
+- **Session validation**: Expired session detection and blocking
+- **Rate limiting**: Request throttling per user/session
 - **Access control**: Operation-level security rules
 - **Security warnings**: Unauthorized access attempt logging
 - **Context propagation**: User/session context through request lifecycle
+
+### Error Handling & SOAP Faults
+- **Custom SOAP fault codes**: Meaningful fault codes based on error type
+  - `Client.Authentication` - Authentication failures
+  - `Client.Authorization` - Authorization failures  
+  - `Client.Validation` - Data validation errors
+  - `Server.Audit` - Audit system failures
+- **Detailed fault messages**: Clear error descriptions for clients
+- **Exception propagation**: Proper error handling from interceptor to SOAP response
+- **Categorized errors**: Structured error types for systematic handling
 
 ## Library Distribution Strategy
 
@@ -133,6 +289,7 @@ interceptor-library/
 ├── ServiceRequest.java
 ├── AbstractInterceptedService.java
 ├── InterceptorRouter.java
+├── FaultError.java
 ├── @Intercepted.java
 └── ServiceInterceptor.java
 ```
@@ -195,6 +352,7 @@ public class YourRouter extends RouteBuilder {
 
 ### Maven Dependencies
 ```xml
+<!-- Core SOAP and Camel -->
 <dependency>
     <groupId>org.apache.camel.quarkus</groupId>
     <artifactId>camel-quarkus-cxf-soap</artifactId>
@@ -207,11 +365,142 @@ public class YourRouter extends RouteBuilder {
     <groupId>org.apache.camel.quarkus</groupId>
     <artifactId>camel-quarkus-log</artifactId>
 </dependency>
+
+<!-- Infinispan Caching -->
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-infinispan-client</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.apache.camel.quarkus</groupId>
+    <artifactId>camel-quarkus-infinispan</artifactId>
+</dependency>
 ```
 
 ### SOAP Endpoint Configuration
 - Service endpoint: `http://localhost:8080/cxf/services/person`
 - WSDL location: `http://localhost:8080/cxf/services/person?wsdl`
+
+### Infinispan Configuration
+
+#### application.properties
+```properties
+# Infinispan connection
+quarkus.infinispan-client.server-list=localhost:11222
+quarkus.infinispan-client.auth-username=
+quarkus.infinispan-client.auth-password=
+
+# Camel Infinispan component
+camel.component.infinispan.configuration.hosts=localhost:11222
+camel.component.infinispan.configuration.cache-container.configuration.statistics=true
+```
+
+#### Cache Configuration (JSON)
+For streaming workloads, configure your cache in Infinispan console:
+```json
+{
+  "distributed-cache": {
+    "mode": "SYNC",
+    "owners": 2,
+    "segments": 256,
+    "capacity-factor": 1.0,
+    "l1-lifespan": 0,
+    "statistics": true,
+    "memory": {
+      "max-size": "2GB",
+      "when-full": "REMOVE"
+    },
+    "expiration": {
+      "lifespan": 3600000,
+      "max-idle": 1800000
+    },
+    "encoding": {
+      "key": {
+        "media-type": "text/plain"
+      },
+      "value": {
+        "media-type": "application/x-protostream"
+      }
+    }
+  }
+}
+```
+
+**Optimizations for Large Data (125-150MB):**
+- **max-size**: Set to 2GB+ to handle multiple large entries
+- **segments**: 256 for better distribution of large chunks  
+- **when-full**: REMOVE policy for automatic cleanup
+- **media-type**: `application/x-protostream` for Protobuf serialization
+
+## Error Handling Examples
+
+### Custom SOAP Fault Responses
+
+When interceptor validation fails, clients receive properly formatted SOAP faults:
+
+#### Authentication Error Example:
+```xml
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+   <soap:Body>
+      <soap:Fault>
+         <faultcode>Client.Authentication</faultcode>
+         <faultstring>Authentication required - user ID is missing</faultstring>
+      </soap:Fault>
+   </soap:Body>
+</soap:Envelope>
+```
+
+#### Authorization Error Example:
+```xml
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+   <soap:Body>
+      <soap:Fault>
+         <faultcode>Client.Authorization</faultcode>
+         <faultstring>Access denied - insufficient privileges for deletePerson operation</faultstring>
+      </soap:Fault>
+   </soap:Body>
+</soap:Envelope>
+```
+
+#### Audit Error Example:
+```xml
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+   <soap:Body>
+      <soap:Fault>
+         <faultcode>Server.Audit</faultcode>
+         <faultstring>Service temporarily unavailable - deletePerson operation is disabled during maintenance window</faultstring>
+      </soap:Fault>
+   </soap:Body>
+</soap:Envelope>
+```
+
+### Triggering Error Scenarios
+
+#### Test Authentication Failure:
+```java
+// Don't set userId - triggers authentication error
+ServiceRequest request = new ServiceRequest("getPersons", null, "direct:getPersons");
+request.setSessionId("session-123");
+// Result: Client.Authentication fault
+```
+
+#### Test Authorization Failure:
+```java
+// Use non-admin user for admin operation
+ServiceRequest request = new ServiceRequest("deletePerson", "John", "direct:deletePerson");
+request.setUserId("regular-user"); // Not "admin-user"
+request.setSessionId("session-123");
+// Result: Client.Authorization fault
+```
+
+#### Test Audit Failure:
+```java
+// Call blocked operation
+ServiceRequest request = new ServiceRequest("deletePerson", "John", "direct:deletePerson");
+request.setUserId("admin-user");
+request.setSessionId("session-123");
+// Result: Server.Audit fault (maintenance mode)
+```
 
 ## Benefits of This Architecture
 
@@ -220,18 +509,26 @@ public class YourRouter extends RouteBuilder {
 - **Reduced boilerplate**: Abstract base class eliminates repetitive interceptor code
 - **Type safety**: Compile-time enforcement prevents bypassing interceptors
 - **Easy testing**: Clean separation between cross-cutting concerns and business logic
+- **Robust error handling**: Structured exception handling with meaningful SOAP faults
+- **Debug-friendly**: Comprehensive logging for troubleshooting
+- **Caching integration**: Built-in support for large data caching with progress tracking
 
 ### For Enterprise Operations
 - **Centralized auditing**: All SOAP operations automatically logged
 - **Security compliance**: Consistent authorization checks across services
 - **Performance monitoring**: Built-in processing time measurement
 - **Troubleshooting**: Comprehensive request/response logging
+- **Maintenance control**: Ability to block operations during maintenance
+- **Custom error responses**: Meaningful error messages for clients
+- **Scalable caching**: Handle 125-150MB data with chunked storage strategy
 
 ### For Maintenance
 - **Library distribution**: Interceptor framework in separate JAR
 - **Version management**: Update cross-cutting concerns independently
 - **Backward compatibility**: New interceptor features don't break existing services
 - **Code reuse**: Same patterns across multiple microservices
+- **Error categorization**: Structured error handling for systematic troubleshooting
+- **Cache optimization**: Configurable chunk sizes and progress tracking for large data
 
 ## Testing
 
@@ -335,15 +632,18 @@ curl -X POST http://localhost:8080/cxf/services/person \
 ### Planned Features
 - **Metrics collection**: Prometheus/Micrometer integration
 - **Distributed tracing**: OpenTelemetry support
-- **Caching layer**: Response caching for read operations
+- **Advanced caching strategies**: TTL-based expiration and cache warming
 - **Rate limiting**: Request throttling per user/operation
 - **Circuit breaker**: Fault tolerance patterns
+- **Cache replication**: Multi-node Infinispan cluster support
 
 ### Library Evolution
 - **Configuration externalization**: Properties-based interceptor configuration
 - **Custom interceptor plugins**: Pluggable interceptor implementations
 - **Multi-tenant support**: Tenant-aware auditing and security
 - **Event sourcing**: Audit event publishing to message queues
+- **Smart cache partitioning**: Dynamic chunk sizing based on data characteristics
+- **Cache analytics**: Usage metrics and optimization recommendations
 
 ## Conclusion
 
@@ -354,5 +654,23 @@ This implementation provides a robust, enterprise-ready foundation for SOAP web 
 ✅ **Library-ready architecture** for reuse across projects  
 ✅ **Clean separation** between infrastructure and business logic  
 ✅ **Scalable design** for multiple SOAP services  
+✅ **Custom SOAP fault handling** with meaningful error codes and messages  
+✅ **Structured exception management** with categorized error types  
+✅ **Production-ready error handling** that propagates from interceptor to client  
+✅ **Comprehensive testing framework** validating end-to-end functionality  
+✅ **Enterprise caching solution** with 125-150MB data support and streaming capabilities  
+✅ **Progress-tracked operations** for large data transfers with real-time feedback  
 
-The pattern demonstrated here ensures that all future SOAP services will automatically inherit proper auditing, security, and monitoring capabilities while maintaining clean, maintainable code.
+### Key Achievements
+
+🛡️ **Security Layer**: Authentication, authorization, session validation with custom fault responses  
+📊 **Audit Layer**: Request/response logging, performance monitoring, maintenance mode control  
+🚨 **Error Handling**: Custom SOAP faults with structured error codes (`Client.Authentication`, `Client.Authorization`, `Server.Audit`, etc.)  
+🏗️ **Scalable Pattern**: Easy to extend for new services and requirements  
+🧪 **Test Coverage**: Unit tests validating interceptor integration and business logic  
+📚 **Documentation**: Complete implementation guide with examples and troubleshooting  
+💾 **Advanced Caching**: Infinispan integration with chunked storage for very large data (125-150MB)  
+📈 **Progress Tracking**: Real-time feedback for streaming operations with error detection  
+⚡ **Performance Optimized**: Protobuf serialization and configurable chunk sizes for optimal throughput  
+
+The pattern demonstrated here ensures that all future SOAP services will automatically inherit proper auditing, security, monitoring, and error handling capabilities while maintaining clean, maintainable code. This is a **production-grade enterprise architecture** that can serve as the foundation for any SOAP-based microservices ecosystem.

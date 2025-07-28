@@ -63,6 +63,33 @@ public class SampleRouter extends RouteBuilder {
                     log.info("Deleting person: " + personName);
                     // Here you can add your business logic (database delete, etc.)
                 });
+
+        // Route for large persons dataset (used by streaming cache service)
+        from("direct:getLargePersons")
+                .log("Processing getLargePersons request - generating large dataset")
+                .process(exchange -> {
+                    Persons persons = objectFactory.createPersons();
+                    
+                    // Generate 10,000 sample persons for large dataset testing
+                    for (int i = 1; i <= 10000; i++) {
+                        String name = "Person " + i;
+                        String street = "Street " + i + " Avenue";
+                        String city = "City " + (i % 100);
+                        String postalCode = String.format("%05d", i);
+                        ContactType type = i % 2 == 0 ? ContactType.WORK : ContactType.PERSONAL;
+                        
+                        Person person = createSamplePerson(name, street, city, postalCode, type);
+                        persons.getPersons().add(person);
+                        
+                        // Log progress every 1000 records
+                        if (i % 1000 == 0) {
+                            log.info("🏗️ Generated " + i + " persons in router...");
+                        }
+                    }
+                    
+                    log.info("✅ Large dataset generated in router: " + persons.getPersons().size() + " persons");
+                    exchange.getIn().setBody(persons);
+                });
     }
 
     private Person createSamplePerson(String name, String street, String city, String postalCode, ContactType type) {
