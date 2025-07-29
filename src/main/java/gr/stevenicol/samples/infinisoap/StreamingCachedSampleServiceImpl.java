@@ -154,6 +154,15 @@ public class StreamingCachedSampleServiceImpl extends AbstractInterceptedService
         executeWithInterceptor("deletePerson", arg0, "direct:deletePerson");
     }
 
+    @Override
+    public boolean writePersonsToFile() {
+        System.out.println("🚀 StreamingCachedSampleService: writePersonsToFile called - streaming from MS SQL to file");
+        
+        // This operation doesn't use cache - direct database streaming to file
+        Boolean result = executeWithInterceptor("writePersonsToFile", null, "direct:writePersonsToFile", Boolean.class);
+        return result != null ? result : false;
+    }
+
     // Large dataset creation for demo
     private Persons createLargePersonsDataset() {
         System.out.println("🏗️ Creating large persons dataset for demonstration...");

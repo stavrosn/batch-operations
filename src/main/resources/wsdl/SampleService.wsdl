@@ -11,6 +11,8 @@
   <xs:element name="getPersonsResponse" type="tns:getPersonsResponse"/>
   <xs:element name="updatePerson" type="tns:updatePerson"/>
   <xs:element name="updatePersonResponse" type="tns:updatePersonResponse"/>
+  <xs:element name="writePersonsToFile" type="tns:writePersonsToFile"/>
+  <xs:element name="writePersonsToFileResponse" type="tns:writePersonsToFileResponse"/>
   <xs:complexType name="addPerson">
     <xs:sequence>
       <xs:element minOccurs="0" name="arg0" type="tns:Person"/>
@@ -73,6 +75,14 @@
   <xs:complexType name="deletePersonResponse">
     <xs:sequence/>
   </xs:complexType>
+  <xs:complexType name="writePersonsToFile">
+    <xs:sequence/>
+  </xs:complexType>
+  <xs:complexType name="writePersonsToFileResponse">
+    <xs:sequence>
+      <xs:element name="writeToFileResult" type="xs:boolean"/>
+    </xs:sequence>
+  </xs:complexType>
   <xs:simpleType name="ContactType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="PERSONAL"/>
@@ -127,6 +137,14 @@
     <wsdl:part element="tns:deletePersonResponse" name="parameters">
     </wsdl:part>
   </wsdl:message>
+  <wsdl:message name="writePersonsToFile">
+    <wsdl:part element="tns:writePersonsToFile" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="writePersonsToFileResponse">
+    <wsdl:part element="tns:writePersonsToFileResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
   <wsdl:portType name="SampleService">
     <wsdl:operation name="addPerson">
       <wsdl:input message="tns:addPerson" name="addPerson">
@@ -163,6 +181,12 @@
     </wsdl:output>
       <wsdl:fault message="tns:NoSuchPersonException" name="NoSuchPersonException">
     </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="writePersonsToFile">
+      <wsdl:input message="tns:writePersonsToFile" name="writePersonsToFile">
+    </wsdl:input>
+      <wsdl:output message="tns:writePersonsToFileResponse" name="writePersonsToFileResponse">
+    </wsdl:output>
     </wsdl:operation>
   </wsdl:portType>
   <wsdl:binding name="SampleServiceSoapBinding" type="tns:SampleService">
@@ -220,6 +244,15 @@
       <wsdl:fault name="NoSuchPersonException">
         <soap:fault name="NoSuchPersonException" use="literal"/>
       </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="writePersonsToFile">
+      <soap:operation soapAction="" style="document"/>
+      <wsdl:input name="writePersonsToFile">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="writePersonsToFileResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
     </wsdl:operation>
   </wsdl:binding>
   <wsdl:service name="SampleService">

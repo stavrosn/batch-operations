@@ -2,7 +2,11 @@ package gr.stevenicol.samples.infinisoap;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.model.dataformat.CsvDataFormat;
 import samples.stevenicol.gr.soap.sampleservice.*;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @ApplicationScoped
 public class SampleRouter extends RouteBuilder {
@@ -90,6 +94,48 @@ public class SampleRouter extends RouteBuilder {
                     log.info("✅ Large dataset generated in router: " + persons.getPersons().size() + " persons");
                     exchange.getIn().setBody(persons);
                 });
+
+        // Route for writePersonsToFile operation - JDBC streaming with CSV output
+        from("direct:writePersonsToFile")
+                .log("🚀 Starting writePersonsToFile operation with JDBC streaming")
+                .setProperty("exportStartTime", constant(System.currentTimeMillis()))
+                .setProperty("exportFileName", simple("persons_export_${date:now:yyyyMMdd_HHmmss}.csv"))
+                .log("📝 Exporting persons to CSV file: ${exchangeProperty.exportFileName}")
+                
+                // Execute streaming SQL query using JDBC component
+                .setBody(constant("SELECT p.name, p.contact_type, a.street, a.city, a.postal_code " +
+                        "FROM persons p LEFT JOIN addresses a ON p.address_id = a.id ORDER BY p.id"))
+                .to("jdbc:dataSource?outputType=StreamList&useIterator=true")
+                .log("📊 Starting to stream SQL results to CSV")
+                
+                // Configure CSV format
+                .marshal().csv()
+                .log("✅ Marshalled streaming results to CSV format")
+                
+                // Write CSV data to file with streaming
+                .to("file:exports?fileName=${exchangeProperty.exportFileName}&fileExist=Override")
+                
+                // Log completion statistics
+                .process(exchange -> {
+                    long startTime = (Long) exchange.getProperty("exportStartTime");
+                    long totalTime = System.currentTimeMillis() - startTime;
+                    String fileName = (String) exchange.getProperty("exportFileName");
+                    
+                    log.info("✅ CSV export completed successfully!");
+                    log.info("📊 Export Statistics:");
+                    log.info("   📄 File: exports/{}", fileName);
+                    log.info("   ⏱️ Total time: {:.2f} seconds", totalTime / 1000.0);
+                    log.info("   💾 Format: CSV with headers");
+                    log.info("   🚀 Method: JDBC streaming with outputType=StreamList");
+                    
+                    // Return success
+                    exchange.getIn().setBody(true);
+                })
+                .onException(Exception.class)
+                    .handled(true)
+                    .log("❌ Error in JDBC streaming export: ${exception.message}")
+                    .setBody(constant(false))
+                .end();
     }
 
     private Person createSamplePerson(String name, String street, String city, String postalCode, ContactType type) {

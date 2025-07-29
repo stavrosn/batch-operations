@@ -54,6 +54,15 @@ public class SampleServiceImpl extends AbstractInterceptedService implements Sam
         executeWithInterceptor("deletePerson", arg0, "direct:deletePerson");
     }
 
+    @Override
+    public boolean writePersonsToFile() {
+        System.out.println("🚀 writePersonsToFile called - streaming persons from MS SQL to file");
+        
+        // Enforced to use interceptor - returns boolean result
+        Boolean result = executeWithInterceptor("writePersonsToFile", null, "direct:writePersonsToFile", Boolean.class);
+        return result != null ? result : false;
+    }
+
     private Persons createDefaultPersons() {
         Persons persons = new Persons();
         persons.getPersons().add(createDefaultPerson("Default Person"));

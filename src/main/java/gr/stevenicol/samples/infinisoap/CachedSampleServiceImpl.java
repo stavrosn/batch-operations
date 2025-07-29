@@ -123,6 +123,15 @@ public class CachedSampleServiceImpl extends AbstractInterceptedService implemen
         executeWithInterceptor("deletePerson", arg0, "direct:deletePerson");
     }
 
+    @Override
+    public boolean writePersonsToFile() {
+        System.out.println("🚀 CachedSampleService: writePersonsToFile called - streaming from MS SQL to file");
+        
+        // This operation doesn't use cache - direct database streaming to file
+        Boolean result = executeWithInterceptor("writePersonsToFile", null, "direct:writePersonsToFile", Boolean.class);
+        return result != null ? result : false;
+    }
+
     // Serialization helpers
     private String serializePersons(Persons persons) {
         // Simple JSON-like serialization for demo
