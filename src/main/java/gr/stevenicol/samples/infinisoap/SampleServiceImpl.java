@@ -63,6 +63,15 @@ public class SampleServiceImpl extends AbstractInterceptedService implements Sam
         return result != null ? result : false;
     }
 
+    @Override
+    public boolean writePersonsToCache() {
+        System.out.println("🚀 writePersonsToCache called - streaming persons from MS SQL to Infinispan");
+        
+        // Enforced to use interceptor - returns boolean result
+        Boolean result = executeWithInterceptor("writePersonsToCache", null, "direct:writePersonsToCache", Boolean.class);
+        return result != null ? result : false;
+    }
+
     private Persons createDefaultPersons() {
         Persons persons = new Persons();
         persons.getPersons().add(createDefaultPerson("Default Person"));

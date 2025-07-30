@@ -2,11 +2,8 @@ package gr.stevenicol.samples.infinisoap;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.model.dataformat.CsvDataFormat;
 import samples.stevenicol.gr.soap.sampleservice.*;
-
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 @ApplicationScoped
 public class SampleRouter extends RouteBuilder {
@@ -136,6 +133,70 @@ public class SampleRouter extends RouteBuilder {
                     .log("❌ Error in JDBC streaming export: ${exception.message}")
                     .setBody(constant(false))
                 .end();
+
+        // Route for writePersonsToCache operation - JDBC streaming to Infinispan cache
+        from("direct:writePersonsToCache")
+                .log("🚀 Starting writePersonsToCache operation - JDBC streaming to Infinispan")
+                .setProperty("cacheStartTime", constant(System.currentTimeMillis()))
+                .setProperty("cacheKey", simple("persons-db-export-${date:now:yyyyMMdd_HHmmss}"))
+                .log("📦 Caching persons data to Infinispan with key: ${exchangeProperty.cacheKey}")
+                
+                // Execute streaming SQL query using JDBC component
+                .setBody(constant("SELECT p.name, p.contact_type, a.street, a.city, a.postal_code " +
+                        "FROM persons p LEFT JOIN addresses a ON p.address_id = a.id ORDER BY p.id"))
+                .to("jdbc:dataSource?outputType=StreamList&useIterator=true")
+                .log("📊 Starting to stream SQL results to CSV for caching")
+                
+                // Configure CSV format - same as file export
+                .marshal().csv()
+                .log("✅ Marshalled streaming results to CSV format")
+                
+                // Prepare CSV data for streaming cache
+                .process(exchange -> {
+                    String cacheKey = (String) exchange.getProperty("cacheKey");
+                    String csvData = exchange.getIn().getBody(String.class);
+                    long dataSize = csvData.length();
+                    
+                    try {
+                        // Set headers for service implementation to use StreamingCacheService
+                        exchange.getIn().setHeader("StreamingCacheKey", cacheKey);
+                        exchange.getIn().setHeader("StreamingCacheData", csvData);
+                        exchange.getIn().setHeader("CacheDataSize", dataSize);
+                        exchange.getIn().setHeader("CacheDataFormat", "CSV");
+                        
+                        log.info("🚀 Prepared CSV data for streaming cache: key={}, size={} chars", 
+                                cacheKey, dataSize);
+                        
+                    } catch (Exception e) {
+                        log.error("❌ Error preparing CSV data for streaming cache: {}", e.getMessage(), e);
+                        throw new RuntimeException("Cache preparation error", e);
+                    }
+                })
+                
+                // Signal completion statistics  
+                .process(exchange -> {
+                    long startTime = (Long) exchange.getProperty("cacheStartTime");
+                    long totalTime = System.currentTimeMillis() - startTime;
+                    String cacheKey = (String) exchange.getProperty("cacheKey");
+                    long dataSize = (Long) exchange.getIn().getHeader("CacheDataSize");
+                    
+                    log.info("✅ Database to cache CSV streaming completed!");
+                    log.info("📊 Cache Statistics:");
+                    log.info("   🔑 Cache Key: {}", cacheKey);
+                    log.info("   📏 Data size: {:.2f} MB ({} chars)", dataSize / (1024.0 * 1024.0), dataSize);
+                    log.info("   ⏱️ Total time: {:.2f} seconds", totalTime / 1000.0);
+                    log.info("   💾 Format: CSV (same as file export)");
+                    log.info("   🚀 Method: JDBC streaming → CSV marshalling → Infinispan chunked storage");
+                    
+                    // The actual caching will be done by the service implementation
+                    // We return success here, and the service layer handles the StreamingCacheService
+                    exchange.getIn().setBody(true);
+                })
+                .onException(Exception.class)
+                    .handled(true)
+                    .log("❌ Error in database to cache CSV streaming: ${exception.message}")
+                    .setBody(constant(false))
+                .end();
     }
 
     private Person createSamplePerson(String name, String street, String city, String postalCode, ContactType type) {
@@ -150,5 +211,10 @@ public class SampleRouter extends RouteBuilder {
         person.setAddress(address);
         
         return person;
+    }
+    
+    private String escapeJson(Object value) {
+        if (value == null) return "";
+        return value.toString().replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 }

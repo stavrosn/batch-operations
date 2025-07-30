@@ -13,6 +13,8 @@
   <xs:element name="updatePersonResponse" type="tns:updatePersonResponse"/>
   <xs:element name="writePersonsToFile" type="tns:writePersonsToFile"/>
   <xs:element name="writePersonsToFileResponse" type="tns:writePersonsToFileResponse"/>
+  <xs:element name="writePersonsToCache" type="tns:writePersonsToCache"/>
+  <xs:element name="writePersonsToCacheResponse" type="tns:writePersonsToCacheResponse"/>
   <xs:complexType name="addPerson">
     <xs:sequence>
       <xs:element minOccurs="0" name="arg0" type="tns:Person"/>
@@ -83,6 +85,14 @@
       <xs:element name="writeToFileResult" type="xs:boolean"/>
     </xs:sequence>
   </xs:complexType>
+  <xs:complexType name="writePersonsToCache">
+    <xs:sequence/>
+  </xs:complexType>
+  <xs:complexType name="writePersonsToCacheResponse">
+    <xs:sequence>
+      <xs:element name="writeToCacheResult" type="xs:boolean"/>
+    </xs:sequence>
+  </xs:complexType>
   <xs:simpleType name="ContactType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="PERSONAL"/>
@@ -145,6 +155,14 @@
     <wsdl:part element="tns:writePersonsToFileResponse" name="parameters">
     </wsdl:part>
   </wsdl:message>
+  <wsdl:message name="writePersonsToCache">
+    <wsdl:part element="tns:writePersonsToCache" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="writePersonsToCacheResponse">
+    <wsdl:part element="tns:writePersonsToCacheResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
   <wsdl:portType name="SampleService">
     <wsdl:operation name="addPerson">
       <wsdl:input message="tns:addPerson" name="addPerson">
@@ -186,6 +204,12 @@
       <wsdl:input message="tns:writePersonsToFile" name="writePersonsToFile">
     </wsdl:input>
       <wsdl:output message="tns:writePersonsToFileResponse" name="writePersonsToFileResponse">
+    </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="writePersonsToCache">
+      <wsdl:input message="tns:writePersonsToCache" name="writePersonsToCache">
+    </wsdl:input>
+      <wsdl:output message="tns:writePersonsToCacheResponse" name="writePersonsToCacheResponse">
     </wsdl:output>
     </wsdl:operation>
   </wsdl:portType>
@@ -251,6 +275,15 @@
         <soap:body use="literal"/>
       </wsdl:input>
       <wsdl:output name="writePersonsToFileResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="writePersonsToCache">
+      <soap:operation soapAction="" style="document"/>
+      <wsdl:input name="writePersonsToCache">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="writePersonsToCacheResponse">
         <soap:body use="literal"/>
       </wsdl:output>
     </wsdl:operation>

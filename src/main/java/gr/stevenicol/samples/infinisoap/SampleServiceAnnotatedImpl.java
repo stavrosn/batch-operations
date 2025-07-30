@@ -53,6 +53,16 @@ public class SampleServiceAnnotatedImpl implements SampleService {
         // Interceptor handles the routing automatically
     }
 
+    @Override
+    public boolean writePersonsToCache() {
+        return false;
+    }
+
+    @Override
+    public boolean writePersonsToFile() {
+        return false;
+    }
+
     // Helper methods remain the same
     private Persons createDefaultPersons() {
         Persons persons = new Persons();

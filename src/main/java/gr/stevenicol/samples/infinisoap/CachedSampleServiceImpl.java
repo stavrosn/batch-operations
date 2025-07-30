@@ -132,6 +132,15 @@ public class CachedSampleServiceImpl extends AbstractInterceptedService implemen
         return result != null ? result : false;
     }
 
+    @Override
+    public boolean writePersonsToCache() {
+        System.out.println("🚀 CachedSampleService: writePersonsToCache called - streaming from MS SQL to Infinispan");
+        
+        // This operation uses the standard cache service, not streaming
+        Boolean result = executeWithInterceptor("writePersonsToCache", null, "direct:writePersonsToCache", Boolean.class);
+        return result != null ? result : false;
+    }
+
     // Serialization helpers
     private String serializePersons(Persons persons) {
         // Simple JSON-like serialization for demo
