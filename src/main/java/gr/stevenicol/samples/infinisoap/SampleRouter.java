@@ -151,27 +151,64 @@ public class SampleRouter extends RouteBuilder {
                 .marshal().csv()
                 .log("✅ Marshalled streaming results to CSV format")
                 
-                // Prepare CSV data for streaming cache
+                // Create CacheData object with CSV data for Protobuf serialization
                 .process(exchange -> {
                     String cacheKey = (String) exchange.getProperty("cacheKey");
                     String csvData = exchange.getIn().getBody(String.class);
                     long dataSize = csvData.length();
                     
                     try {
+                        // Create CacheData object with timestamp and CSV data
+                        String currentTimestamp = LocalDateTime.now().toString();
+                        CacheData cacheData = new CacheData(currentTimestamp, csvData.getBytes());
+                        
                         // Set headers for service implementation to use StreamingCacheService
                         exchange.getIn().setHeader("StreamingCacheKey", cacheKey);
-                        exchange.getIn().setHeader("StreamingCacheData", csvData);
+                        exchange.getIn().setHeader("StreamingCacheData", cacheData);
                         exchange.getIn().setHeader("CacheDataSize", dataSize);
-                        exchange.getIn().setHeader("CacheDataFormat", "CSV");
                         
-                        log.info("🚀 Prepared CSV data for streaming cache: key={}, size={} chars", 
+                        log.info("🚀 Created CacheData object for streaming cache: key={}, size={} chars", 
                                 cacheKey, dataSize);
+                        log.info("📅 Cache timestamp: {}", currentTimestamp);
                         
                     } catch (Exception e) {
-                        log.error("❌ Error preparing CSV data for streaming cache: {}", e.getMessage(), e);
-                        throw new RuntimeException("Cache preparation error", e);
+                        log.error("❌ Error creating CacheData object for streaming cache: {}", e.getMessage(), e);
+                        throw new RuntimeException("Cache data creation error", e);
                     }
                 })
+                
+                // Write CSV data to Infinispan using StreamingCacheService
+                .process(exchange -> {
+                    String cacheKey = (String) exchange.getIn().getHeader("StreamingCacheKey");
+                    CacheData cacheData = (CacheData) exchange.getIn().getHeader("StreamingCacheData");
+                    
+                    // Extract CSV data from CacheData object
+                    byte[] csvData = cacheData.getData();
+                    
+                    // Use StreamingCacheService to store the data with progress tracking
+                    StreamingCacheService streamingService = exchange.getContext().getRegistry()
+                        .lookupByNameAndType("streamingCacheService", StreamingCacheService.class);
+                    
+                    if (streamingService != null) {
+                        log.info("🚀 Starting chunked upload to Infinispan cache...");
+                        
+                        java.util.concurrent.CompletableFuture<Boolean> cacheResult = 
+                            streamingService.putLargeDataStream(cacheKey, new String(csvData), progress -> {
+                                log.info("📈 Cache upload progress: {}% - {}", 
+                                    progress.getProgressPercent(), progress.getMessage());
+                            });
+                        
+                        // Wait for completion (blocking for route simplicity)
+                        Boolean success = cacheResult.get();
+                        log.info("✅ Cache upload completed: {}", success);
+                        
+                        exchange.getIn().setHeader("CacheUploadSuccess", success);
+                    } else {
+                        log.error("❌ StreamingCacheService not found in registry");
+                        exchange.getIn().setHeader("CacheUploadSuccess", false);
+                    }
+                })
+                .log("✅ CSV data cached to Infinispan with chunked storage")
                 
                 // Signal completion statistics  
                 .process(exchange -> {
@@ -185,12 +222,18 @@ public class SampleRouter extends RouteBuilder {
                     log.info("   🔑 Cache Key: {}", cacheKey);
                     log.info("   📏 Data size: {:.2f} MB ({} chars)", dataSize / (1024.0 * 1024.0), dataSize);
                     log.info("   ⏱️ Total time: {:.2f} seconds", totalTime / 1000.0);
-                    log.info("   💾 Format: CSV (same as file export)");
-                    log.info("   🚀 Method: JDBC streaming → CSV marshalling → Infinispan chunked storage");
+                    log.info("   💾 Format: CSV → CacheData (Protobuf serialized)");
+                    log.info("   🚀 Method: JDBC streaming → CSV marshalling → CacheData → Infinispan chunked storage");
                     
-                    // The actual caching will be done by the service implementation
-                    // We return success here, and the service layer handles the StreamingCacheService
-                    exchange.getIn().setBody(true);
+                    // Check if cache upload was successful
+                    Boolean cacheSuccess = (Boolean) exchange.getIn().getHeader("CacheUploadSuccess");
+                    if (cacheSuccess != null && cacheSuccess) {
+                        log.info("✅ Overall operation completed successfully!");
+                        exchange.getIn().setBody(true);
+                    } else {
+                        log.error("❌ Cache upload failed - returning false");
+                        exchange.getIn().setBody(false);
+                    }
                 })
                 .onException(Exception.class)
                     .handled(true)

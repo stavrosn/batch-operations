@@ -6,6 +6,7 @@ import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -31,7 +32,7 @@ public class CamelInfinispanCacheService {
      */
     public boolean putLargeString(String key, String data) {
         String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
-        CacheData cacheData = new CacheData(timestamp, data);
+        CacheData cacheData = new CacheData(timestamp, data.getBytes(StandardCharsets.UTF_8));
         
         log.info("Storing large string in cache via Camel: key={}, dataSize={} characters, timestamp={}", 
                  key, data.length(), timestamp);
@@ -71,7 +72,7 @@ public class CamelInfinispanCacheService {
     /**
      * Retrieve large string data from cache
      */
-    public String getLargeString(String key) {
+    public byte[] getLargeString(String key) {
         CacheData result = getLargeStringData(key);
         return result != null ? result.getData() : null;
     }
@@ -90,7 +91,7 @@ public class CamelInfinispanCacheService {
         
         if (result != null) {
             log.info("Found cached data: key={}, dataSize={} characters, timestamp={}", 
-                     key, result.getData().length(), result.getDateString());
+                     key, result.getData().length, result.getDateString());
         } else {
             log.info("No cached data found for key={}", key);
         }
@@ -102,7 +103,10 @@ public class CamelInfinispanCacheService {
      * Retrieve large string data asynchronously
      */
     public CompletableFuture<String> getLargeStringAsync(String key) {
-        return CompletableFuture.supplyAsync(() -> getLargeString(key));
+        return CompletableFuture.supplyAsync(() -> {
+            byte[] data = getLargeString(key);
+            return data != null ? new String(data) : null;
+        });
     }
 
     /**

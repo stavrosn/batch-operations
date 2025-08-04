@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.jws.WebService;
 import samples.stevenicol.gr.soap.sampleservice.*;
+import gr.stevenicol.samples.infinisoap.gateway.CacheNotificationService;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -21,6 +22,9 @@ public class StreamingCachedSampleServiceImpl extends AbstractInterceptedService
 
     @Inject
     StreamingCacheService streamingCacheService;
+
+    @Inject
+    CacheNotificationService gatewayNotificationService;
 
     @Override
     public void addPerson(Person arg0) {
@@ -99,6 +103,34 @@ public class StreamingCachedSampleServiceImpl extends AbstractInterceptedService
         // Don't wait for caching to complete - return result immediately
         cachingFuture.thenAccept(cached -> {
             System.out.println("📦 Background caching completed: " + cached);
+            
+            if (cached) {
+                // Notify gateway service about successful caching
+                System.out.println("🔔 Notifying gateway service about cache completion...");
+                
+                // Get cache metadata for the stored data
+                streamingCacheService.getCacheMetadata(cacheKey).thenAccept(metadata -> {
+                    if (metadata != null) {
+                        gatewayNotificationService.notifyPersonsDataCached(metadata)
+                            .thenAccept(notificationSuccess -> {
+                                if (notificationSuccess) {
+                                    System.out.println("✅ Gateway notification sent successfully for cache key: " + cacheKey);
+                                } else {
+                                    System.err.println("❌ Failed to notify gateway for cache key: " + cacheKey);
+                                }
+                            })
+                            .exceptionally(notificationError -> {
+                                System.err.println("❌ Gateway notification error: " + notificationError.getMessage());
+                                return null;
+                            });
+                    } else {
+                        System.err.println("⚠️ Could not retrieve cache metadata for gateway notification");
+                    }
+                }).exceptionally(metadataError -> {
+                    System.err.println("❌ Error retrieving cache metadata: " + metadataError.getMessage());
+                    return null;
+                });
+            }
         }).exceptionally(throwable -> {
             System.err.println("❌ Background caching failed: " + throwable.getMessage());
             return null;

@@ -188,6 +188,31 @@ public class StreamingCacheService {
         });
     }
 
+    /**
+     * Get cache metadata for a key.
+     * 
+     * @param key Cache key
+     * @return CompletableFuture with CacheMetadata or null if not found
+     */
+    public CompletableFuture<CacheMetadata> getCacheMetadata(String key) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                log.info("STREAM-METADATA: Getting metadata for key={}", key);
+                CacheMetadata metadata = getMetadata(key);
+                if (metadata != null) {
+                    log.info("STREAM-METADATA: ✅ Found metadata for key={}, totalSize={}, totalChunks={}", 
+                            key, metadata.getTotalSize(), metadata.getTotalChunks());
+                } else {
+                    log.warn("STREAM-METADATA: ❌ No metadata found for key={}", key);
+                }
+                return metadata;
+            } catch (Exception e) {
+                log.error("STREAM-METADATA: ❌ Error getting metadata for key={}: {}", key, e.getMessage());
+                return null;
+            }
+        });
+    }
+
     // Helper methods for cache operations
     private boolean storeMetadata(String key, CacheMetadata metadata) {
         try {

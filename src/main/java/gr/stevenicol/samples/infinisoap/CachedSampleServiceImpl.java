@@ -40,11 +40,11 @@ public class CachedSampleServiceImpl extends AbstractInterceptedService implemen
         
         // Try cache first
         System.out.println("📦 Checking cache for key: " + cacheKey);
-        String cachedData = cacheService.getLargeString(cacheKey);
+        byte[] cachedData = cacheService.getLargeString(cacheKey);
         
-        if (cachedData != null && !cachedData.isEmpty()) {
-            System.out.println("✅ Cache HIT! Returning cached data (length: " + cachedData.length() + " chars)");
-            return deserializePersons(cachedData);
+        if (cachedData != null && cachedData.length > 0) {
+            System.out.println("✅ Cache HIT! Returning cached data (length: " + cachedData.length + " bytes)");
+            return deserializePersons(new String(cachedData));
         }
         
         System.out.println("❌ Cache MISS! Fetching from database...");
@@ -84,10 +84,10 @@ public class CachedSampleServiceImpl extends AbstractInterceptedService implemen
         String cacheKey = "person-" + arg0;
         
         // Try cache first
-        String cachedData = cacheService.getLargeString(cacheKey);
-        if (cachedData != null && !cachedData.isEmpty()) {
+        byte[] cachedData = cacheService.getLargeString(cacheKey);
+        if (cachedData != null && cachedData.length > 0) {
             System.out.println("✅ Cache HIT for person: " + arg0);
-            return deserializePerson(cachedData);
+            return deserializePerson(new String(cachedData));
         }
         
         System.out.println("❌ Cache MISS for person: " + arg0);

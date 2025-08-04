@@ -627,6 +627,221 @@ curl -X POST http://localhost:8080/cxf/services/person \
   -d '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">...</soap:Envelope>'
 ```
 
+## Gateway SOAP Service Integration
+
+### Overview
+
+The project includes a complete **Gateway SOAP Service** integration that provides cache completion notifications to external systems. When large data caching operations complete, the system automatically notifies a gateway service with comprehensive metadata.
+
+### Gateway Service Components
+
+#### 1. Gateway WSDL Contract
+
+**File:** `src/main/resources/wsdl/gateway.wsdl`
+
+- **Namespace**: `http://gateway.infinisoap.samples.stevenicol.gr/` (different from main service)
+- **Service Endpoint**: `http://localhost:8081/gateway/services/cache`
+- **Operations**:
+  - `notifyCacheCompletion` - Notify gateway of successful cache operations
+  - `getCacheStatus` - Query cache job status by job ID
+
+**Complex Types:**
+- `CacheNotificationMetadata` - Complete cache metadata (size, chunks, timestamps)
+- `CacheJobStatus` - Job status enumeration (PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED)
+
+**Fault Types:**
+- `InvalidJobFault` - Invalid job ID or parameters
+- `GatewayProcessingFault` - Gateway service processing errors
+
+#### 2. Generated Client Classes
+
+**Package**: `gr.stevenicol.samples.infinisoap.gateway`
+
+The following classes are auto-generated from `gateway.wsdl` using Quarkus CXF extension:
+- `CacheGatewayService.java` - Main service interface
+- `CacheNotificationMetadata.java` - Cache metadata complex type
+- `NotifyCacheCompletionRequest/Response.java` - Notification request/response
+- `GetCacheStatusRequest/Response.java` - Status query request/response
+- `CacheJobStatus.java` - Status enumeration
+- `InvalidJobFaultMessage.java` - Invalid job fault exception
+- `GatewayProcessingFaultMessage.java` - Processing fault exception
+
+#### 3. Client Infrastructure
+
+##### `CacheGatewayClient.java` ⭐
+**Low-level SOAP client** for direct gateway communication:
+- **Notification method**: `notifyCacheCompletion(jobId, cacheKey, dataSize, chunks, chunkSize, dataType)`
+- **Status query method**: `getCacheStatus(jobId)`
+- **Connection testing**: `testConnection()` for connectivity validation
+- **Job ID generation**: `generateJobId(cacheKey)` for unique job identifiers
+- **Comprehensive error handling**: Catches and logs all fault types
+- **Async operations**: Returns CompletableFuture for non-blocking calls
+
+##### `CacheNotificationService.java` ⭐
+**High-level service wrapper** for seamless integration:
+- **Integration method**: `notifyCacheCompletion(CacheMetadata, dataType)`
+- **Convenience method**: `notifyPersonsDataCached(CacheMetadata)` for persons data
+- **Configuration-aware**: Respects gateway enable/disable settings
+- **Connection testing**: `testGatewayConnection()` for health checks
+- **Automatic job ID generation**: Creates unique identifiers from cache keys
+
+##### `GatewayConfig.java`
+**Configuration management** with application.properties integration:
+- **Endpoint configuration**: Gateway service URL and timeouts
+- **Feature toggles**: Enable/disable notifications and async mode  
+- **Retry settings**: Configurable retry attempts and delays
+- **Validation methods**: Check if gateway is properly configured
+
+#### 4. Integration with Streaming Cache
+
+##### Modified `StreamingCachedSampleServiceImpl.java`
+The main SOAP service now includes **automatic gateway notifications**:
+
+```java
+// Background caching with gateway notification
+cachingFuture.thenAccept(cached -> {
+    if (cached) {
+        // Get cache metadata and notify gateway
+        streamingCacheService.getCacheMetadata(cacheKey).thenAccept(metadata -> {
+            if (metadata != null) {
+                gatewayNotificationService.notifyPersonsDataCached(metadata)
+                    .thenAccept(notificationSuccess -> {
+                        if (notificationSuccess) {
+                            System.out.println("✅ Gateway notification sent successfully");
+                        } else {
+                            System.err.println("❌ Failed to notify gateway");
+                        }
+                    });
+            }
+        });
+    }
+});
+```
+
+##### Enhanced `StreamingCacheService.java`
+Added **metadata retrieval capability**:
+- **New method**: `getCacheMetadata(String key)` returns CompletableFuture<CacheMetadata>
+- **Async operation**: Non-blocking metadata retrieval for notifications
+- **Error handling**: Graceful handling of missing or corrupted metadata
+- **Comprehensive logging**: Detailed metadata retrieval tracking
+
+### Gateway Integration Flow
+
+```
+1. SOAP Request    → StreamingCachedSampleServiceImpl.getPersons()
+2. Immediate Response → Client gets data quickly (no waiting for cache)
+3. Background Caching → StreamingCacheService stores data in chunks
+4. Cache Completion → Caching future completes successfully
+5. Metadata Retrieval → Get CacheMetadata from Infinispan
+6. Gateway Notification → CacheNotificationService calls gateway SOAP service
+7. External Processing → Gateway service can trigger downstream systems
+```
+
+### Configuration
+
+#### Application Properties
+```properties
+# Gateway SOAP Client Configuration
+gateway.soap.endpoint=http://localhost:8081/gateway/services/cache
+gateway.soap.timeout=30000
+gateway.soap.retry.attempts=3
+gateway.soap.retry.delay=1000
+gateway.notifications.enabled=true
+gateway.notifications.async=true
+
+# Quarkus CXF Code Generation
+quarkus.cxf.codegen.wsdl2java.includes=wsdl/SampleService.wsdl,wsdl/gateway.wsdl
+```
+
+**Configuration Properties:**
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `gateway.soap.endpoint` | `http://localhost:8081/gateway/services/cache` | Gateway service URL |
+| `gateway.soap.timeout` | `30000` | Request timeout in milliseconds |
+| `gateway.notifications.enabled` | `true` | Enable/disable notifications |
+| `gateway.notifications.async` | `true` | Use async notifications |
+| `gateway.soap.retry.attempts` | `3` | Number of retry attempts |
+| `gateway.soap.retry.delay` | `1000` | Retry delay in milliseconds |
+
+### Usage Examples
+
+#### High-Level API (Recommended)
+```java
+@Inject
+CacheNotificationService notificationService;
+
+// Automatic notification after cache completion
+CompletableFuture<Boolean> result = notificationService.notifyPersonsDataCached(cacheMetadata);
+result.thenAccept(success -> {
+    if (success) {
+        System.out.println("Gateway notified successfully");
+    }
+});
+```
+
+#### Low-Level API (Advanced)
+```java
+@Inject
+CacheGatewayClient gatewayClient;
+
+// Manual notification with full control
+String jobId = CacheGatewayClient.generateJobId("my-cache-key");
+CompletableFuture<Boolean> result = gatewayClient.notifyCacheCompletion(
+    jobId, "cache-key", 1024000, 10, 102400, "PERSONS_XML"
+);
+```
+
+#### Connection Testing
+```java
+@Inject
+CacheNotificationService notificationService;
+
+// Test gateway connectivity
+CompletableFuture<Boolean> connectionTest = notificationService.testGatewayConnection();
+connectionTest.thenAccept(connected -> {
+    if (connected) {
+        System.out.println("Gateway is reachable");
+    }
+});
+```
+
+### Error Handling
+
+The gateway integration provides **comprehensive error handling**:
+
+#### SOAP Fault Types
+- **InvalidJobFaultMessage**: Invalid job ID or parameters - gateway rejects the request
+- **GatewayProcessingFaultMessage**: Gateway service internal errors during processing
+- **Connection errors**: Network timeouts, unreachable gateway service
+- **Configuration errors**: Missing or invalid gateway endpoint configuration
+
+#### Error Recovery
+- **Retry mechanism**: Configurable retry attempts with exponential backoff
+- **Graceful degradation**: Caching continues even if gateway notifications fail
+- **Detailed logging**: All errors logged with context for troubleshooting
+- **Status monitoring**: Connection health checks and configuration validation
+
+### Benefits of Gateway Integration
+
+#### For Cache Operations
+- ✅ **Non-blocking notifications**: No impact on primary SOAP service response times
+- ✅ **Reliable delivery**: Retry mechanisms ensure notifications reach gateway
+- ✅ **Comprehensive metadata**: Full cache information for downstream processing
+- ✅ **Job tracking**: Unique job IDs for request correlation and status tracking
+
+#### For External Systems
+- ✅ **Immediate awareness**: Real-time notifications of cache completion events
+- ✅ **Rich metadata**: Size, chunk count, timestamps for processing decisions
+- ✅ **Status queries**: Ability to check cache job status asynchronously
+- ✅ **Fault tolerance**: Structured error handling with meaningful fault messages
+
+#### For Operations
+- ✅ **Monitoring integration**: Gateway calls can trigger monitoring alerts
+- ✅ **Workflow automation**: Cache completion can trigger downstream batch jobs
+- ✅ **Audit compliance**: Complete audit trail of cache operations and notifications
+- ✅ **Troubleshooting**: Detailed logging for diagnostic and debugging purposes
+
 ## Future Enhancements
 
 ### Planned Features
@@ -636,6 +851,8 @@ curl -X POST http://localhost:8080/cxf/services/person \
 - **Rate limiting**: Request throttling per user/operation
 - **Circuit breaker**: Fault tolerance patterns
 - **Cache replication**: Multi-node Infinispan cluster support
+- **Gateway service discovery**: Dynamic endpoint resolution
+- **Notification queuing**: Message queue integration for reliable delivery
 
 ### Library Evolution
 - **Configuration externalization**: Properties-based interceptor configuration
@@ -644,6 +861,8 @@ curl -X POST http://localhost:8080/cxf/services/person \
 - **Event sourcing**: Audit event publishing to message queues
 - **Smart cache partitioning**: Dynamic chunk sizing based on data characteristics
 - **Cache analytics**: Usage metrics and optimization recommendations
+- **Gateway load balancing**: Multiple gateway endpoints with failover support
+- **Notification templating**: Customizable notification formats and content
 
 ## Conclusion
 

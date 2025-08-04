@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+             xmlns:tns="http://gateway.infinisoap.samples.stevenicol.gr/"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+             targetNamespace="http://gateway.infinisoap.samples.stevenicol.gr/">
+
+    <!-- Types definition -->
+    <types>
+        <xsd:schema targetNamespace="http://gateway.infinisoap.samples.stevenicol.gr/"
+                    elementFormDefault="qualified">
+
+            <!-- Cache Notification Request -->
+            <xsd:element name="notifyCacheCompletionRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="jobId" type="xsd:string" minOccurs="1"/>
+                        <xsd:element name="cacheMetadata" type="tns:CacheNotificationMetadata" minOccurs="1"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <!-- Cache Notification Response -->
+            <xsd:element name="notifyCacheCompletionResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="success" type="xsd:boolean" minOccurs="1"/>
+                        <xsd:element name="message" type="xsd:string" minOccurs="0"/>
+                        <xsd:element name="acknowledgmentId" type="xsd:string" minOccurs="0"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <!-- Cache Status Request -->
+            <xsd:element name="getCacheStatusRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="jobId" type="xsd:string" minOccurs="1"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <!-- Cache Status Response -->
+            <xsd:element name="getCacheStatusResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="jobId" type="xsd:string" minOccurs="1"/>
+                        <xsd:element name="status" type="tns:CacheJobStatus" minOccurs="1"/>
+                        <xsd:element name="cacheMetadata" type="tns:CacheNotificationMetadata" minOccurs="0"/>
+                        <xsd:element name="lastUpdated" type="xsd:dateTime" minOccurs="0"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <!-- Complex Types -->
+            <xsd:complexType name="CacheNotificationMetadata">
+                <xsd:sequence>
+                    <xsd:element name="cacheKey" type="xsd:string" minOccurs="1"/>
+                    <xsd:element name="originalDataSize" type="xsd:long" minOccurs="1"/>
+                    <xsd:element name="totalChunks" type="xsd:int" minOccurs="1"/>
+                    <xsd:element name="chunkSize" type="xsd:int" minOccurs="1"/>
+                    <xsd:element name="storageTimestamp" type="xsd:dateTime" minOccurs="1"/>
+                    <xsd:element name="compressionUsed" type="xsd:boolean" minOccurs="0"/>
+                    <xsd:element name="dataType" type="xsd:string" minOccurs="0"/>
+                    <xsd:element name="sourceSystem" type="xsd:string" minOccurs="0"/>
+                    <xsd:element name="retentionPolicy" type="xsd:string" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+
+            <!-- Enumerations -->
+            <xsd:simpleType name="CacheJobStatus">
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="PENDING"/>
+                    <xsd:enumeration value="IN_PROGRESS"/>
+                    <xsd:enumeration value="COMPLETED"/>
+                    <xsd:enumeration value="FAILED"/>
+                    <xsd:enumeration value="CANCELLED"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+
+            <!-- Fault Messages -->
+            <xsd:element name="invalidJobFault">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="jobId" type="xsd:string"/>
+                        <xsd:element name="reason" type="xsd:string"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="gatewayProcessingFault">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="errorCode" type="xsd:string"/>
+                        <xsd:element name="errorMessage" type="xsd:string"/>
+                        <xsd:element name="timestamp" type="xsd:dateTime"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+        </xsd:schema>
+    </types>
+
+    <!-- Messages -->
+    <message name="notifyCacheCompletionRequestMessage">
+        <part name="parameters" element="tns:notifyCacheCompletionRequest"/>
+    </message>
+
+    <message name="notifyCacheCompletionResponseMessage">
+        <part name="parameters" element="tns:notifyCacheCompletionResponse"/>
+    </message>
+
+    <message name="getCacheStatusRequestMessage">
+        <part name="parameters" element="tns:getCacheStatusRequest"/>
+    </message>
+
+    <message name="getCacheStatusResponseMessage">
+        <part name="parameters" element="tns:getCacheStatusResponse"/>
+    </message>
+
+    <message name="invalidJobFaultMessage">
+        <part name="fault" element="tns:invalidJobFault"/>
+    </message>
+
+    <message name="gatewayProcessingFaultMessage">
+        <part name="fault" element="tns:gatewayProcessingFault"/>
+    </message>
+
+    <!-- Port Type -->
+    <portType name="CacheGatewayService">
+        
+        <operation name="notifyCacheCompletion">
+            <documentation>Notify the gateway that cache operation has completed with metadata</documentation>
+            <input message="tns:notifyCacheCompletionRequestMessage"/>
+            <output message="tns:notifyCacheCompletionResponseMessage"/>
+            <fault name="invalidJobFault" message="tns:invalidJobFaultMessage"/>
+            <fault name="gatewayProcessingFault" message="tns:gatewayProcessingFaultMessage"/>
+        </operation>
+
+        <operation name="getCacheStatus">
+            <documentation>Get the status of a cache job by jobId</documentation>
+            <input message="tns:getCacheStatusRequestMessage"/>
+            <output message="tns:getCacheStatusResponseMessage"/>
+            <fault name="invalidJobFault" message="tns:invalidJobFaultMessage"/>
+            <fault name="gatewayProcessingFault" message="tns:gatewayProcessingFaultMessage"/>
+        </operation>
+
+    </portType>
+
+    <!-- Binding -->
+    <binding name="CacheGatewayServiceSoapBinding" type="tns:CacheGatewayService">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        
+        <operation name="notifyCacheCompletion">
+            <soap:operation soapAction="http://gateway.infinisoap.samples.stevenicol.gr/notifyCacheCompletion"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+            <fault name="invalidJobFault">
+                <soap:fault name="invalidJobFault" use="literal"/>
+            </fault>
+            <fault name="gatewayProcessingFault">
+                <soap:fault name="gatewayProcessingFault" use="literal"/>
+            </fault>
+        </operation>
+
+        <operation name="getCacheStatus">
+            <soap:operation soapAction="http://gateway.infinisoap.samples.stevenicol.gr/getCacheStatus"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+            <fault name="invalidJobFault">
+                <soap:fault name="invalidJobFault" use="literal"/>
+            </fault>
+            <fault name="gatewayProcessingFault">
+                <soap:fault name="gatewayProcessingFault" use="literal"/>
+            </fault>
+        </operation>
+
+    </binding>
+
+    <!-- Service -->
+    <service name="CacheGatewayWebService">
+        <documentation>Gateway service for cache completion notifications and status tracking</documentation>
+        <port name="CacheGatewayServicePort" binding="tns:CacheGatewayServiceSoapBinding">
+            <soap:address location="http://localhost:8081/gateway/services/cache"/>
+        </port>
+    </service>
+
+</definitions>

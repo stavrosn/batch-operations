@@ -34,8 +34,8 @@ public class CacheIntegrationExample {
     public String getCachedServiceResponse(String operationName, String userId) {
         String cacheKey = String.format("soap-response-%s-%s", operationName, userId);
         
-        String cachedData = cacheService.getLargeString(cacheKey);
-        return cachedData;
+        byte[] cachedData = cacheService.getLargeString(cacheKey);
+        return new String(cachedData);
     }
 
     /**
@@ -59,7 +59,7 @@ public class CacheIntegrationExample {
         
         // Check if we have a cached response for this request
         String responseCacheKey = String.format("cached-response-%s-%s", operation, userId);
-        String cachedResponse = cacheService.getLargeString(responseCacheKey);
+        byte[] cachedResponse = cacheService.getLargeString(responseCacheKey);
         
         if (cachedResponse != null) {
             // Get full cache data if we need metadata

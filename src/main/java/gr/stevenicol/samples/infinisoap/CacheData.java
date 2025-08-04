@@ -15,10 +15,10 @@ public class CacheData {
     public String dateString;
 
     @ProtoField(number = 2)
-    public String data;
+    public byte[] data;
 
     @ProtoFactory
-    public CacheData(String dateString, String data) {
+    public CacheData(String dateString, byte[] data) {
         this.dateString = dateString;
         this.data = data;
     }
@@ -28,7 +28,7 @@ public class CacheData {
         return dateString;
     }
 
-    public String getData() {
+    public byte[] getData() {
         return data;
     }
 
@@ -36,7 +36,7 @@ public class CacheData {
     public String toString() {
         return "CacheData{" +
                 "dateString='" + dateString + '\'' +
-                ", dataSize=" + (data != null ? data.length() : 0) + " characters" +
+                ", dataSize=" + (data != null ? data.length : 0) + " characters" +
                 '}';
     }
 
@@ -46,11 +46,11 @@ public class CacheData {
         if (o == null || getClass() != o.getClass()) return false;
         CacheData cacheData = (CacheData) o;
         return java.util.Objects.equals(dateString, cacheData.dateString) &&
-               java.util.Objects.equals(data, cacheData.data);
+               java.util.Objects.equals(data.length, cacheData.data.length);
     }
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(dateString, data);
+        return java.util.Objects.hash(dateString, data.length);
     }
 }
